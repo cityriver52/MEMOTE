@@ -3,11 +3,11 @@ using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using Forms = System.Windows.Forms;
+using WpfButton = System.Windows.Controls.Button;
 
 namespace memoNOW;
 
@@ -115,7 +115,7 @@ public partial class MainWindow : Window
 
     private void CompleteMemo_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button button || button.Tag is not Guid id)
+        if (sender is not WpfButton button || button.Tag is not Guid id)
         {
             return;
         }
@@ -286,7 +286,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (Keyboard.FocusedElement is not Button button || button.Tag is not Guid id)
+        if (Keyboard.FocusedElement is not WpfButton button || button.Tag is not Guid id)
         {
             return;
         }
@@ -345,13 +345,13 @@ public partial class MainWindow : Window
         Keyboard.Focus(button);
     }
 
-    private static Button? FindCompletionButton(DependencyObject root, Guid id)
+    private static WpfButton? FindCompletionButton(DependencyObject root, Guid id)
     {
         var count = VisualTreeHelper.GetChildrenCount(root);
         for (var i = 0; i < count; i++)
         {
             var child = VisualTreeHelper.GetChild(root, i);
-            if (child is Button button && button.Tag is Guid buttonId && buttonId == id)
+            if (child is WpfButton button && button.Tag is Guid buttonId && buttonId == id)
             {
                 return button;
             }
