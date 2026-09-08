@@ -84,11 +84,6 @@ public sealed class HotkeySettings
 
     public static HotkeySettings FromInput(System.Windows.Input.Key key, ModifierKeys modifiers)
     {
-        if (key == System.Windows.Input.Key.System)
-        {
-            key = Keyboard.FocusedElement is null ? key : key;
-        }
-
         return new HotkeySettings
         {
             Ctrl = modifiers.HasFlag(ModifierKeys.Control),
