@@ -50,7 +50,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish latest GitHub Release
+      - name: Publish anonymous latest GitHub Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: pwsh
         env:
@@ -60,6 +60,7 @@ jobs:
           $exe = '.\artifacts\memoNOW-win-x64\memoNOW.exe'
           $repo = $env:GITHUB_REPOSITORY
           $sha = $env:GITHUB_SHA
+          $notes = 'Latest portable Windows build from the main branch. Public download; no GitHub login or .NET installation is required.'
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -69,8 +70,8 @@ jobs:
           gh release view latest --repo $repo *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload latest $exe --clobber --repo $repo
-            gh release edit latest --repo $repo --title 'memoNOW latest' --notes 'Latest portable Windows build from the main branch. No .NET installation is required.' --prerelease
+            gh release edit latest --repo $repo --title 'memoNOW latest' --notes $notes --prerelease=false --latest
           }
           else {
-            gh release create latest $exe --repo $repo --target $sha --title 'memoNOW latest' --notes 'Latest portable Windows build from the main branch. No .NET installation is required.' --prerelease
+            gh release create latest $exe --repo $repo --target $sha --title 'memoNOW latest' --notes $notes --latest
           }
