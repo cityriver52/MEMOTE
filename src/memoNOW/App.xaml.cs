@@ -56,7 +56,25 @@ public partial class App : System.Windows.Application
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         DiagnosticLog.WriteException("dispatcher unhandled exception", e.Exception);
+
+        if (LooksLikeBubbleAnimationFailure(e.Exception))
+        {
+            DiagnosticLog.Write("Bubble animation failure was contained; memoNOW will continue without terminating.");
+            e.Handled = true;
+            return;
+        }
+
         e.Handled = false;
+    }
+
+    private static bool LooksLikeBubbleAnimationFailure(Exception exception)
+    {
+        var details = exception.ToString();
+        return details.Contains("StartAmbientBubbleAnimation", StringComparison.Ordinal)
+            || details.Contains("StartIdleFloat", StringComparison.Ordinal)
+            || details.Contains("PlaySpawnAnimation", StringComparison.Ordinal)
+            || details.Contains("BubbleHost_Loaded", StringComparison.Ordinal)
+            || details.Contains("System.Windows.Media.Animation", StringComparison.Ordinal);
     }
 
     private static void ShowFatalStartupMessage()
