@@ -18,10 +18,32 @@ The first prototype deliberately stays small:
 - Unfinished memos survive app/PC restarts
 - Local-only storage; no account, sync, tags, folders, due dates, or history
 
+## Recommended distribution: portable EXE
+
+For normal use, the target Windows PC does **not** need the .NET SDK or .NET Runtime installed.
+
+GitHub Actions publishes a self-contained, single-file Windows x64 executable named `memoNOW.exe`. The .NET runtime and required libraries are bundled into the executable.
+
+On the target PC:
+
+1. Download the `memoNOW-win-x64-portable` artifact from the latest successful GitHub Actions build.
+2. Extract `memoNOW.exe`.
+3. Put it in any writable folder and run it.
+
+No installer, package manager, administrator rights, or .NET installation is required by memoNOW itself.
+
+> Note: organization security policy, Windows Defender, SmartScreen, AppLocker, WDAC, or other endpoint-management rules can still block an unsigned executable. memoNOW does not attempt to bypass those controls.
+
 ## Requirements
 
-- Windows 10 or Windows 11
-- .NET 8 SDK to build from source
+### To run the portable build
+
+- Windows 10 or Windows 11, x64
+- No .NET installation required
+
+### To build from source
+
+- .NET 8 SDK
 
 ## Run from source
 
@@ -29,13 +51,25 @@ The first prototype deliberately stays small:
 dotnet run --project .\src\memoNOW\memoNOW.csproj
 ```
 
-## Build
+## Build from source
 
 ```powershell
 dotnet build .\src\memoNOW\memoNOW.csproj -c Release
 ```
 
-The executable is produced under `src\memoNOW\bin\Release\net8.0-windows\`.
+## Create the portable EXE locally
+
+```powershell
+.\scripts\publish-portable.ps1
+```
+
+The result is written to:
+
+```text
+artifacts\memoNOW-win-x64\memoNOW.exe
+```
+
+The portable publish is self-contained and single-file. Trimming is intentionally disabled because memoNOW uses WPF/WinForms desktop APIs and reliability is more important than minimizing the executable size.
 
 ## Data location
 
