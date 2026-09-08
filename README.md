@@ -1,126 +1,115 @@
 # memoNOW
 
-**memoNOW** is a tiny Windows scratchpad for things you need to keep in your head only for the next few minutes or hours.
-
-It is intentionally *not* a knowledge base, archive, calendar, or project manager. Add a short memo, keep it visible, and delete it as soon as it is done.
-
-## Prototype scope
-
-The first prototype deliberately stays small:
-
-- Quick one-line memo input
-- User-configurable global hotkey (default: `Win + Shift + Space`)
-- Global hotkey toggles the window: hidden → show/focus, visible → hide
-- Up to 10 active memos
-- Keyboard-first completion with `Delete`
-- Tray-resident operation
-- `Esc` hides the window
-- Closing/minimizing hides to the tray instead of quitting
-- Unfinished memos survive app/PC restarts
-- Local-only storage; no account, sync, tags, folders, due dates, or history
-
-## Global shortcut settings
-
-The default shortcut is `Win + Shift + Space`. If Windows or another application already uses it, click **ショートカット設定** at the bottom of memoNOW, then click the capture field and press the new key combination you want to use.
-
-The shortcut can also be changed from the tray menu via **Shortcut settings...**.
-
-The shortcut works as a toggle:
-
-- When memoNOW is hidden, press it to show memoNOW and focus the memo input.
-- When memoNOW is visible, press it again to hide memoNOW.
-
-memoNOW tests the new shortcut before accepting it. If Windows reports that the combination is already in use, memoNOW keeps the previous shortcut instead. The chosen shortcut is saved locally and restored on the next launch.
-
-For safety, a shortcut must include at least one of `Ctrl`, `Alt`, `Shift`, or `Win`.
-
-## Recommended distribution: public GitHub Release
-
-For normal use, the target Windows PC does **not** need the .NET SDK or .NET Runtime installed.
-
-Every push to `main` is built by GitHub Actions. If the build succeeds, the public `latest` GitHub Release is automatically updated and the newest self-contained Windows x64 executable is attached as `memoNOW.exe`.
-
-**No GitHub login is required to download the public release asset.**
-
-- Anonymous direct download (recommended): https://github.com/cityriver52/memoNOW/releases/latest/download/memoNOW.exe
-- Release page: https://github.com/cityriver52/memoNOW/releases/latest
-
-On the target PC, open the anonymous direct-download URL above and save `memoNOW.exe` to any writable folder. Then run it.
-
-No installer, package manager, administrator rights, GitHub account, or .NET installation is required by memoNOW itself.
-
-The Actions artifact is retained only as a CI/debugging output. End users should not be directed to Actions artifacts because downloading those can require GitHub authentication.
-
-> Note: organization security policy, Windows Defender, SmartScreen, AppLocker, WDAC, or other endpoint-management rules can still block an unsigned executable. memoNOW does not attempt to bypass those controls.
-
-## Requirements
-
-### To run the portable build
-
-- Windows 10 or Windows 11, x64
-- No .NET installation required
-
-### To build from source
-
-- .NET 8 SDK
-
-## Run from source
-
-```powershell
-dotnet run --project .\src\memoNOW\memoNOW.csproj
-```
-
-## Build from source
-
-```powershell
-dotnet build .\src\memoNOW\memoNOW.csproj -c Release
-```
-
-## Create the portable EXE locally
-
-```powershell
-.\scripts\publish-portable.ps1
-```
-
-The result is written to:
-
-```text
-artifacts\memoNOW-win-x64\memoNOW.exe
-```
-
-The portable publish is self-contained and single-file. Trimming is intentionally disabled because memoNOW uses WPF/WinForms desktop APIs and reliability is more important than minimizing the executable size.
-
-## Data location
-
-Active memos are stored locally at:
-
-```text
-%LOCALAPPDATA%\memoNOW\memos.json
-```
-
-Shortcut settings are stored locally at:
-
-```text
-%LOCALAPPDATA%\memoNOW\settings.json
-```
-
-There is intentionally no completed-item history. If a memo matters long-term, it belongs somewhere else.
-
-## Prototype controls
-
-| Action | Control |
-| --- | --- |
-| Show/hide memoNOW | Configurable global shortcut (default `Win + Shift + Space`) |
-| Change global shortcut | Bottom **ショートカット設定** button / tray menu |
-| Add memo | Type and press `Enter` |
-| Select memo | From the input, press `↓`; then use `↑` / `↓` |
-| Complete memo | Press `Delete` on the selected bubble, or click its `✓` button |
-| Hide window | Global shortcut while visible, `Esc`, minimize, or close |
-| Re-open from tray | Double-click tray icon / tray menu |
-| Quit completely | Tray icon → `Exit` |
-
-## Design rule
+**memoNOW** は、「今だけ頭に置いておきたいこと」を泡のように浮かべ、終わったら弾いて消す超短期メモです。
 
 > memoNOW is RAM, not storage.
 
-Features that encourage accumulating information should be treated with suspicion. The prototype optimizes for capture speed and disposal speed first.
+現在の memoNOW は **ローカルHTML版のみ**です。旧WPF / EXE版は廃止しました。
+
+## 特徴
+
+- `memoNOW.html` 1ファイルだけで動作
+- Chromeでローカルファイルとして直接実行
+- Webサーバー不要
+- インストーラー不要
+- 管理者権限不要
+- GitHub Pages不使用
+- 外部API不使用
+- `fetch` / WebSocket / XMLHttpRequest 不使用
+- メモ本文をネットワークへ送信しない
+- Content Security Policy でネットワーク接続を禁止
+- メモはChromeの `localStorage` のみに保存
+- 最大10件
+- Enterで追加
+- ↓で一番上の泡を選択
+- ↑ / ↓で移動
+- Delete または Enter で泡を弾いて削除
+- 泡の浮遊、生成、破裂、小泡パーティクルのアニメーション
+
+## 入手
+
+リポジトリ直下の `memoNOW.html` を保存してください。
+
+直接保存用:
+
+`https://raw.githubusercontent.com/cityriver52/memoNOW/main/memoNOW.html`
+
+GitHubへのアクセスが必要なのは **ファイルを取得するときだけ**です。保存後のmemoNOWはローカルファイルだけで完結し、GitHubへ通信しません。
+
+## 一番簡単な起動方法
+
+`memoNOW.html` をChromeへドラッグするか、右クリックしてChromeで開きます。
+
+ただし通常のブラウザタブではなくアプリ風の専用ウィンドウとして使う場合は、WindowsショートカットからChromeを `--app` モードで起動します。
+
+## Chromeをアプリ風ウィンドウとして起動する
+
+まず `memoNOW.html` を削除・移動しない固定フォルダへ置きます。
+
+例:
+
+```text
+C:\Users\<ユーザー名>\Documents\memoNOW\memoNOW.html
+```
+
+Windowsで新しいショートカットを作り、リンク先を次の形式にします。
+
+```text
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --app="file:///C:/Users/<ユーザー名>/Documents/memoNOW/memoNOW.html"
+```
+
+Chromeが別の場所にインストールされている場合は、`chrome.exe` の部分だけ実際のパスへ変更してください。
+
+これで、アドレスバーやタブのないmemoNOW専用ウィンドウとして起動します。
+
+## キーボードショートカットで起動する
+
+上で作ったWindowsショートカットを右クリックし、**プロパティ → ショートカット キー** に任意のキーを設定します。
+
+例:
+
+```text
+Ctrl + Alt + M
+```
+
+この方式ではmemoNOW自身がグローバルキーを監視しません。Windowsが普通のショートカットを起動し、そのショートカットがChromeを開きます。
+
+会社PCで使う場合も、ネイティブ常駐アプリ、キーボードフック、RegisterHotKey、タスクスケジューラなどは使用しません。
+
+## データ保存
+
+メモはJavaScriptの `localStorage` に保存します。
+
+サーバー、GitHub、Google Driveなどには保存しません。
+
+`file://` のローカルページに対するストレージはブラウザ管理なので、次の場合はメモが消える可能性があります。
+
+- Chromeのサイトデータを削除した場合
+- 組織ポリシー等でブラウザデータが消去された場合
+- 別ブラウザで開いた場合
+- 環境によってローカルファイルの保存領域の扱いが変わった場合
+
+memoNOWは短期記憶用なので、重要な長期情報は別の保存先へ移してください。
+
+## ネットワークについて
+
+`memoNOW.html` には外部リソースへのURL参照や通信コードを含めていません。
+
+さらにHTML内のContent Security Policyで次を指定しています。
+
+```text
+connect-src 'none'
+```
+
+そのためアプリ動作中に `fetch`、WebSocket等を使って外部へ接続する設計にはなっていません。
+
+CSSとJavaScriptもすべて `memoNOW.html` 内に埋め込んでいます。
+
+## ファイル構成
+
+```text
+memoNOW.html   # アプリ本体。これだけで動く
+README.md      # 説明
+```
+
+ビルド工程はありません。
