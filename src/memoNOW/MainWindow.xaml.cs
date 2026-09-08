@@ -3,8 +3,10 @@ using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using Forms = System.Windows.Forms;
 
 namespace memoNOW;
@@ -68,6 +70,13 @@ public partial class MainWindow : Window
 
     private void MemoInput_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
+        if (e.Key == Key.Down && Keyboard.Modifiers == ModifierKeys.None && Memos.Count > 0)
+        {
+            e.Handled = true;
+            FocusMemoCompletionButton(0);
+            return;
+        }
+
         if (e.Key != Key.Enter || Keyboard.Modifiers != ModifierKeys.None)
         {
             return;
@@ -106,22 +115,34 @@ public partial class MainWindow : Window
 
     private void CompleteMemo_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not System.Windows.Controls.Button button || button.Tag is not Guid id)
+        if (sender is not Button button || button.Tag is not Guid id)
         {
             return;
         }
 
-        var item = Memos.FirstOrDefault(memo => memo.Id == id);
-        if (item is null)
+        CompleteMemoById(id, keepKeyboardNavigation: false);
+    }
+
+    private void CompleteMemoById(Guid id, bool keepKeyboardNavigation)
+    {
+        var index = Memos.ToList().FindIndex(memo => memo.Id == id);
+        if (index < 0)
         {
             return;
         }
 
-        Memos.Remove(item);
+        Memos.RemoveAt(index);
         _statusOverride = null;
         SaveMemos();
         UpdateStatus();
-        FocusInput();
+
+        if (!keepKeyboardNavigation || Memos.Count == 0)
+        {
+            FocusInput();
+            return;
+        }
+
+        FocusMemoCompletionButton(Math.Min(index, Memos.Count - 1));
     }
 
     private void ShortcutSettings_Click(object sender, RoutedEventArgs e)
@@ -252,19 +273,97 @@ public partial class MainWindow : Window
 
     private void UpdateStatus()
     {
-        var normalStatus = $"{Memos.Count} / {MaxMemoCount} 件 · {_hotkeySettings.DisplayText} で表示/非表示 · Escで隠す";
+        var normalStatus = $"{Memos.Count} / {MaxMemoCount} 件 · {_hotkeySettings.DisplayText} で表示/非表示 · ↓で選択 / Deleteで完了";
         StatusText.Text = _statusOverride ?? normalStatus;
     }
 
     private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (e.Key != Key.Escape)
+        if (e.Key == Key.Escape)
+        {
+            e.Handled = true;
+            Hide();
+            return;
+        }
+
+        if (Keyboard.FocusedElement is not Button button || button.Tag is not Guid id)
         {
             return;
         }
 
-        e.Handled = true;
-        Hide();
+        var index = Memos.ToList().FindIndex(memo => memo.Id == id);
+        if (index < 0)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            e.Handled = true;
+            CompleteMemoById(id, keepKeyboardNavigation: true);
+            return;
+        }
+
+        if (e.Key == Key.Up && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            e.Handled = true;
+            if (index == 0)
+            {
+                FocusInput();
+            }
+            else
+            {
+                FocusMemoCompletionButton(index - 1);
+            }
+
+            return;
+        }
+
+        if (e.Key == Key.Down && Keyboard.Modifiers == ModifierKeys.None && index < Memos.Count - 1)
+        {
+            e.Handled = true;
+            FocusMemoCompletionButton(index + 1);
+        }
+    }
+
+    private void FocusMemoCompletionButton(int index)
+    {
+        if (index < 0 || index >= Memos.Count)
+        {
+            FocusInput();
+            return;
+        }
+
+        var id = Memos[index].Id;
+        var button = FindCompletionButton(this, id);
+        if (button is null)
+        {
+            return;
+        }
+
+        button.Focus();
+        Keyboard.Focus(button);
+    }
+
+    private static Button? FindCompletionButton(DependencyObject root, Guid id)
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is Button button && button.Tag is Guid buttonId && buttonId == id)
+            {
+                return button;
+            }
+
+            var nested = FindCompletionButton(child, id);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
     }
 
     private void Window_StateChanged(object? sender, EventArgs e)
