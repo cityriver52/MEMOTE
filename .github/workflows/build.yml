@@ -25,3 +25,22 @@ jobs:
 
       - name: Build
         run: dotnet build .\src\memoNOW\memoNOW.csproj -c Release --no-restore
+
+      - name: Publish portable EXE
+        shell: pwsh
+        run: .\scripts\publish-portable.ps1
+
+      - name: Verify portable EXE
+        shell: pwsh
+        run: |
+          $exe = '.\artifacts\memoNOW-win-x64\memoNOW.exe'
+          if (-not (Test-Path $exe)) { throw 'Portable memoNOW.exe was not created.' }
+          Get-Item $exe | Select-Object Name, Length, LastWriteTime
+
+      - name: Upload portable EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: memoNOW-win-x64-portable
+          path: artifacts/memoNOW-win-x64/memoNOW.exe
+          if-no-files-found: error
+          retention-days: 30
