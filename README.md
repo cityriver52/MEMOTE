@@ -18,19 +18,24 @@ The first prototype deliberately stays small:
 - Unfinished memos survive app/PC restarts
 - Local-only storage; no account, sync, tags, folders, due dates, or history
 
-## Recommended distribution: portable EXE
+## Recommended distribution: GitHub Release
 
 For normal use, the target Windows PC does **not** need the .NET SDK or .NET Runtime installed.
 
-GitHub Actions publishes a self-contained, single-file Windows x64 executable named `memoNOW.exe`. The .NET runtime and required libraries are bundled into the executable.
+Every push to `main` is built by GitHub Actions. If the build succeeds, the `latest` GitHub Release is automatically updated and the newest self-contained Windows x64 executable is attached as `memoNOW.exe`.
+
+- Release page: https://github.com/cityriver52/memoNOW/releases/tag/latest
+- Direct latest EXE: https://github.com/cityriver52/memoNOW/releases/download/latest/memoNOW.exe
 
 On the target PC:
 
-1. Download the `memoNOW-win-x64-portable` artifact from the latest successful GitHub Actions build.
-2. Extract `memoNOW.exe`.
-3. Put it in any writable folder and run it.
+1. Open the `memoNOW latest` Release.
+2. Under **Assets**, click `memoNOW.exe`.
+3. Put the downloaded EXE in any writable folder and run it.
 
 No installer, package manager, administrator rights, or .NET installation is required by memoNOW itself.
+
+The Actions artifact is retained as a CI/debugging output, but normal users should use the Release download above.
 
 > Note: organization security policy, Windows Defender, SmartScreen, AppLocker, WDAC, or other endpoint-management rules can still block an unsigned executable. memoNOW does not attempt to bypass those controls.
 
