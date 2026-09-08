@@ -14,12 +14,17 @@ public partial class MainWindow : Window
     private const int MaxMemoCount = 10;
     private const int HotkeyId = 0x4D4E;
     private const int WmHotkey = 0x0312;
+    private const uint ModAlt = 0x0001;
+    private const uint ModControl = 0x0002;
     private const uint ModShift = 0x0004;
     private const uint ModWin = 0x0008;
+    private const uint ModNoRepeat = 0x4000;
 
     private readonly MemoStore _store = new();
+    private readonly SettingsStore _settingsStore = new();
     private Forms.NotifyIcon? _notifyIcon;
     private HwndSource? _hwndSource;
+    private HotkeySettings _hotkeySettings;
     private bool _hotkeyRegistered;
     private bool _exitRequested;
     private string? _statusOverride;
@@ -30,6 +35,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = this;
+        _hotkeySettings = _settingsStore.LoadHotkey();
 
         foreach (var memo in _store.Load())
         {
@@ -48,12 +54,9 @@ public partial class MainWindow : Window
         _hwndSource = HwndSource.FromHwnd(handle);
         _hwndSource?.AddHook(WndProc);
 
-        var virtualKey = (uint)KeyInterop.VirtualKeyFromKey(Key.Space);
-        _hotkeyRegistered = RegisterHotKey(handle, HotkeyId, ModWin | ModShift, virtualKey);
-
-        if (!_hotkeyRegistered)
+        if (!TryRegisterHotkey(_hotkeySettings))
         {
-            _statusOverride = "Win + Shift + Space を登録できませんでした。別アプリと競合している可能性があります。";
+            _statusOverride = $"{_hotkeySettings.DisplayText} を登録できませんでした。ショートカット設定から変更してください。";
             UpdateStatus();
         }
     }
@@ -121,6 +124,116 @@ public partial class MainWindow : Window
         FocusInput();
     }
 
+    private void ShortcutSettings_Click(object sender, RoutedEventArgs e)
+    {
+        OpenHotkeySettings();
+    }
+
+    private void OpenHotkeySettings()
+    {
+        var previous = _hotkeySettings.Clone();
+        UnregisterCurrentHotkey();
+
+        var dialog = new HotkeySettingsWindow(previous)
+        {
+            Owner = this
+        };
+
+        var result = dialog.ShowDialog();
+        if (result != true)
+        {
+            _hotkeySettings = previous;
+            RestorePreviousHotkey(previous);
+            return;
+        }
+
+        var candidate = dialog.SelectedSettings;
+        if (!TryRegisterHotkey(candidate))
+        {
+            _hotkeySettings = previous;
+            RestorePreviousHotkey(previous);
+            _statusOverride = $"{candidate.DisplayText} は登録できません。別の組み合わせを試してください。";
+            UpdateStatus();
+
+            MessageBox.Show(
+                this,
+                $"{candidate.DisplayText} はWindowsまたは別のアプリが使用しているため登録できませんでした。\n\n元のショートカットに戻しました。",
+                "ショートカットの競合",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        _hotkeySettings = candidate;
+        _statusOverride = null;
+
+        try
+        {
+            _settingsStore.SaveHotkey(_hotkeySettings);
+        }
+        catch (IOException)
+        {
+            _statusOverride = "ショートカットは変更されましたが、設定を保存できませんでした。";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _statusOverride = "ショートカットは変更されましたが、設定保存先へのアクセス権がありません。";
+        }
+
+        UpdateStatus();
+        FocusInput();
+    }
+
+    private void RestorePreviousHotkey(HotkeySettings previous)
+    {
+        if (!TryRegisterHotkey(previous))
+        {
+            _statusOverride = $"{previous.DisplayText} を登録できません。ショートカット設定から別の組み合わせを指定してください。";
+        }
+        else
+        {
+            _statusOverride = null;
+        }
+
+        UpdateStatus();
+    }
+
+    private bool TryRegisterHotkey(HotkeySettings settings)
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero || !settings.TryGetKey(out var key) || !settings.IsValid(out _))
+        {
+            _hotkeyRegistered = false;
+            return false;
+        }
+
+        uint modifiers = ModNoRepeat;
+        if (settings.Ctrl) modifiers |= ModControl;
+        if (settings.Alt) modifiers |= ModAlt;
+        if (settings.Shift) modifiers |= ModShift;
+        if (settings.Win) modifiers |= ModWin;
+
+        var virtualKey = (uint)KeyInterop.VirtualKeyFromKey(key);
+        _hotkeyRegistered = RegisterHotKey(handle, HotkeyId, modifiers, virtualKey);
+        return _hotkeyRegistered;
+    }
+
+    private void UnregisterCurrentHotkey()
+    {
+        if (!_hotkeyRegistered)
+        {
+            return;
+        }
+
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle != IntPtr.Zero)
+        {
+            UnregisterHotKey(handle, HotkeyId);
+        }
+
+        _hotkeyRegistered = false;
+    }
+
     private void SaveMemos()
     {
         try
@@ -139,7 +252,8 @@ public partial class MainWindow : Window
 
     private void UpdateStatus()
     {
-        StatusText.Text = _statusOverride ?? $"{Memos.Count} / {MaxMemoCount} 件 · Win + Shift + Space ですぐ入力 · Escで隠す";
+        var normalStatus = $"{Memos.Count} / {MaxMemoCount} 件 · {_hotkeySettings.DisplayText} ですぐ入力 · Escで隠す";
+        StatusText.Text = _statusOverride ?? normalStatus;
     }
 
     private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -187,6 +301,11 @@ public partial class MainWindow : Window
 
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Open", null, (_, _) => Dispatcher.Invoke(ShowAndFocus));
+        menu.Items.Add("Shortcut settings...", null, (_, _) => Dispatcher.Invoke(() =>
+        {
+            ShowAndFocus();
+            OpenHotkeySettings();
+        }));
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => Dispatcher.Invoke(ExitApplication));
         _notifyIcon.ContextMenuStrip = menu;
@@ -229,13 +348,7 @@ public partial class MainWindow : Window
 
     private void CleanupNativeResources()
     {
-        var handle = new WindowInteropHelper(this).Handle;
-
-        if (_hotkeyRegistered && handle != IntPtr.Zero)
-        {
-            UnregisterHotKey(handle, HotkeyId);
-            _hotkeyRegistered = false;
-        }
+        UnregisterCurrentHotkey();
 
         if (_hwndSource is not null)
         {
