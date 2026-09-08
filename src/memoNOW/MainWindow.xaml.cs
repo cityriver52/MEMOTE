@@ -155,7 +155,7 @@ public partial class MainWindow : Window
             _statusOverride = $"{candidate.DisplayText} は登録できません。別の組み合わせを試してください。";
             UpdateStatus();
 
-            MessageBox.Show(
+            System.Windows.MessageBox.Show(
                 this,
                 $"{candidate.DisplayText} はWindowsまたは別のアプリが使用しているため登録できませんでした。\n\n元のショートカットに戻しました。",
                 "ショートカットの競合",
