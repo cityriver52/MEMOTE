@@ -9,7 +9,7 @@ It is intentionally *not* a knowledge base, archive, calendar, or project manage
 The first prototype deliberately stays small:
 
 - Quick one-line memo input
-- Global hotkey: `Win + Shift + Space`
+- User-configurable global hotkey (default: `Win + Shift + Space`)
 - Up to 10 active memos
 - One-click completion (completed memos are deleted immediately)
 - Tray-resident operation
@@ -17,6 +17,16 @@ The first prototype deliberately stays small:
 - Closing/minimizing hides to the tray instead of quitting
 - Unfinished memos survive app/PC restarts
 - Local-only storage; no account, sync, tags, folders, due dates, or history
+
+## Global shortcut settings
+
+The default shortcut is `Win + Shift + Space`. If Windows or another application already uses it, click **ショートカット設定** at the bottom of memoNOW, then click the capture field and press the new key combination you want to use.
+
+The shortcut can also be changed from the tray menu via **Shortcut settings...**.
+
+memoNOW tests the new shortcut before accepting it. If Windows reports that the combination is already in use, memoNOW keeps the previous shortcut instead. The chosen shortcut is saved locally and restored on the next launch.
+
+For safety, a shortcut must include at least one of `Ctrl`, `Alt`, `Shift`, or `Win`.
 
 ## Recommended distribution: GitHub Release
 
@@ -84,13 +94,20 @@ Active memos are stored locally at:
 %LOCALAPPDATA%\memoNOW\memos.json
 ```
 
+Shortcut settings are stored locally at:
+
+```text
+%LOCALAPPDATA%\memoNOW\settings.json
+```
+
 There is intentionally no completed-item history. If a memo matters long-term, it belongs somewhere else.
 
 ## Prototype controls
 
 | Action | Control |
 | --- | --- |
-| Open/focus memoNOW | `Win + Shift + Space` |
+| Open/focus memoNOW | Configurable global shortcut (default `Win + Shift + Space`) |
+| Change global shortcut | Bottom **ショートカット設定** button / tray menu |
 | Add memo | Type and press `Enter` |
 | Complete memo | Click `Done` |
 | Hide window | `Esc`, minimize, or close |
