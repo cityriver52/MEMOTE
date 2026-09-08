@@ -252,7 +252,7 @@ public partial class MainWindow : Window
 
     private void UpdateStatus()
     {
-        var normalStatus = $"{Memos.Count} / {MaxMemoCount} 件 · {_hotkeySettings.DisplayText} ですぐ入力 · Escで隠す";
+        var normalStatus = $"{Memos.Count} / {MaxMemoCount} 件 · {_hotkeySettings.DisplayText} で表示/非表示 · Escで隠す";
         StatusText.Text = _statusOverride ?? normalStatus;
     }
 
@@ -312,6 +312,17 @@ public partial class MainWindow : Window
         _notifyIcon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowAndFocus);
     }
 
+    private void ToggleVisibility()
+    {
+        if (IsVisible)
+        {
+            Hide();
+            return;
+        }
+
+        ShowAndFocus();
+    }
+
     private void ShowAndFocus()
     {
         if (!IsVisible)
@@ -368,7 +379,7 @@ public partial class MainWindow : Window
     {
         if (msg == WmHotkey && wParam.ToInt32() == HotkeyId)
         {
-            ShowAndFocus();
+            ToggleVisibility();
             handled = true;
         }
 
