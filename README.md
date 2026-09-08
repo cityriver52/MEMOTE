@@ -12,7 +12,7 @@ The first prototype deliberately stays small:
 - User-configurable global hotkey (default: `Win + Shift + Space`)
 - Global hotkey toggles the window: hidden → show/focus, visible → hide
 - Up to 10 active memos
-- One-click completion (completed memos are deleted immediately)
+- Keyboard-first completion with `Delete`
 - Tray-resident operation
 - `Esc` hides the window
 - Closing/minimizing hides to the tray instead of quitting
@@ -34,24 +34,22 @@ memoNOW tests the new shortcut before accepting it. If Windows reports that the 
 
 For safety, a shortcut must include at least one of `Ctrl`, `Alt`, `Shift`, or `Win`.
 
-## Recommended distribution: GitHub Release
+## Recommended distribution: public GitHub Release
 
 For normal use, the target Windows PC does **not** need the .NET SDK or .NET Runtime installed.
 
-Every push to `main` is built by GitHub Actions. If the build succeeds, the `latest` GitHub Release is automatically updated and the newest self-contained Windows x64 executable is attached as `memoNOW.exe`.
+Every push to `main` is built by GitHub Actions. If the build succeeds, the public `latest` GitHub Release is automatically updated and the newest self-contained Windows x64 executable is attached as `memoNOW.exe`.
 
-- Release page: https://github.com/cityriver52/memoNOW/releases/tag/latest
-- Direct latest EXE: https://github.com/cityriver52/memoNOW/releases/download/latest/memoNOW.exe
+**No GitHub login is required to download the public release asset.**
 
-On the target PC:
+- Anonymous direct download (recommended): https://github.com/cityriver52/memoNOW/releases/latest/download/memoNOW.exe
+- Release page: https://github.com/cityriver52/memoNOW/releases/latest
 
-1. Open the `memoNOW latest` Release.
-2. Under **Assets**, click `memoNOW.exe`.
-3. Put the downloaded EXE in any writable folder and run it.
+On the target PC, open the anonymous direct-download URL above and save `memoNOW.exe` to any writable folder. Then run it.
 
-No installer, package manager, administrator rights, or .NET installation is required by memoNOW itself.
+No installer, package manager, administrator rights, GitHub account, or .NET installation is required by memoNOW itself.
 
-The Actions artifact is retained as a CI/debugging output, but normal users should use the Release download above.
+The Actions artifact is retained only as a CI/debugging output. End users should not be directed to Actions artifacts because downloading those can require GitHub authentication.
 
 > Note: organization security policy, Windows Defender, SmartScreen, AppLocker, WDAC, or other endpoint-management rules can still block an unsigned executable. memoNOW does not attempt to bypass those controls.
 
@@ -115,7 +113,8 @@ There is intentionally no completed-item history. If a memo matters long-term, i
 | Show/hide memoNOW | Configurable global shortcut (default `Win + Shift + Space`) |
 | Change global shortcut | Bottom **ショートカット設定** button / tray menu |
 | Add memo | Type and press `Enter` |
-| Complete memo | Click `Done` |
+| Select memo | From the input, press `↓`; then use `↑` / `↓` |
+| Complete memo | Press `Delete` on the selected bubble, or click its `✓` button |
 | Hide window | Global shortcut while visible, `Esc`, minimize, or close |
 | Re-open from tray | Double-click tray icon / tray menu |
 | Quit completely | Tray icon → `Exit` |
