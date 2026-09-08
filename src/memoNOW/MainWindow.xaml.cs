@@ -62,7 +62,7 @@ public partial class MainWindow : Window
         FocusInput();
     }
 
-    private void MemoInput_KeyDown(object sender, KeyEventArgs e)
+    private void MemoInput_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key != Key.Enter || Keyboard.Modifiers != ModifierKeys.None)
         {
@@ -141,7 +141,7 @@ public partial class MainWindow : Window
         StatusText.Text = _statusOverride ?? $"{Memos.Count} / {MaxMemoCount} 件 · Win + Shift + Space ですぐ入力 · Escで隠す";
     }
 
-    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key != Key.Escape)
         {
