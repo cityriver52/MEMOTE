@@ -16,12 +16,12 @@ public partial class HotkeySettingsWindow : Window
         UpdateCaptureButton();
     }
 
-    private void HotkeyCaptureButton_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    private void HotkeyCaptureButton_GotKeyboardFocus(object sender, System.Windows.Input.KeyboardFocusChangedEventArgs e)
     {
         HintText.Text = "新しいショートカットを押してください…";
     }
 
-    private void HotkeyCaptureButton_PreviewKeyDown(object sender, KeyEventArgs e)
+    private void HotkeyCaptureButton_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
 
