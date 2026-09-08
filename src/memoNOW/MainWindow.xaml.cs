@@ -3,9 +3,13 @@ using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Shapes;
+using System.Windows.Threading;
 using Forms = System.Windows.Forms;
 using WpfButton = System.Windows.Controls.Button;
 
@@ -24,11 +28,17 @@ public partial class MainWindow : Window
 
     private readonly MemoStore _store = new();
     private readonly SettingsStore _settingsStore = new();
+    private readonly Random _random = new();
+    private readonly HashSet<Guid> _pendingSpawnIds = new();
+    private readonly HashSet<Guid> _removingMemoIds = new();
+    private readonly HashSet<FrameworkElement> _floatingBubbleHosts = new();
+
     private Forms.NotifyIcon? _notifyIcon;
     private HwndSource? _hwndSource;
     private HotkeySettings _hotkeySettings;
     private bool _hotkeyRegistered;
     private bool _exitRequested;
+    private bool _ambientAnimationStarted;
     private string? _statusOverride;
 
     public ObservableCollection<MemoItem> Memos { get; } = new();
@@ -66,6 +76,7 @@ public partial class MainWindow : Window
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         FocusInput();
+        StartAmbientBubbleAnimation();
     }
 
     private void MemoInput_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -96,53 +107,483 @@ public partial class MainWindow : Window
 
         if (Memos.Count >= MaxMemoCount)
         {
-            _statusOverride = "10件いっぱいです。どれかを終わらせてから追加してください。";
+            _statusOverride = "10件いっぱいです。どれかの泡をはじいてから追加してください。";
             UpdateStatus();
             return;
         }
 
-        Memos.Insert(0, new MemoItem
+        var memo = new MemoItem
         {
             Text = text,
             CreatedAt = DateTimeOffset.Now
-        });
+        };
+
+        _pendingSpawnIds.Add(memo.Id);
+        Memos.Insert(0, memo);
 
         MemoInput.Clear();
         _statusOverride = null;
         SaveMemos();
         UpdateStatus();
+
+        // If layout has already created the visual before Loaded dispatches, make sure the birth animation is still requested.
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            var host = FindBubbleHost(memo.Id);
+            if (host is not null && _pendingSpawnIds.Remove(memo.Id))
+            {
+                PlaySpawnAnimation(host);
+            }
+        }), DispatcherPriority.Loaded);
     }
 
-    private void CompleteMemo_Click(object sender, RoutedEventArgs e)
+    private async void CompleteMemo_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not WpfButton button || button.Tag is not Guid id)
         {
             return;
         }
 
-        CompleteMemoById(id, keepKeyboardNavigation: false);
+        await CompleteMemoWithAnimationAsync(id, keepKeyboardNavigation: false);
     }
 
-    private void CompleteMemoById(Guid id, bool keepKeyboardNavigation)
+    private async Task CompleteMemoWithAnimationAsync(Guid id, bool keepKeyboardNavigation)
     {
-        var index = Memos.ToList().FindIndex(memo => memo.Id == id);
-        if (index < 0)
+        if (!_removingMemoIds.Add(id))
         {
             return;
         }
 
-        Memos.RemoveAt(index);
-        _statusOverride = null;
-        SaveMemos();
-        UpdateStatus();
-
-        if (!keepKeyboardNavigation || Memos.Count == 0)
+        try
         {
-            FocusInput();
+            var index = Memos.ToList().FindIndex(memo => memo.Id == id);
+            if (index < 0)
+            {
+                return;
+            }
+
+            var host = FindBubbleHost(id);
+            if (host is not null)
+            {
+                await PlayPopAnimationAsync(host);
+            }
+
+            // The memo is removed only after the bubble has popped so the motion remains spatially coherent.
+            index = Memos.ToList().FindIndex(memo => memo.Id == id);
+            if (index < 0)
+            {
+                return;
+            }
+
+            Memos.RemoveAt(index);
+            _statusOverride = null;
+            SaveMemos();
+            UpdateStatus();
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!keepKeyboardNavigation || Memos.Count == 0)
+                {
+                    FocusInput();
+                    return;
+                }
+
+                FocusMemoCompletionButton(Math.Min(index, Memos.Count - 1));
+            }), DispatcherPriority.Loaded);
+        }
+        finally
+        {
+            _removingMemoIds.Remove(id);
+        }
+    }
+
+    private void BubbleHost_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement host || host.Tag is not Guid id)
+        {
             return;
         }
 
-        FocusMemoCompletionButton(Math.Min(index, Memos.Count - 1));
+        StartIdleFloat(host, id);
+
+        if (_pendingSpawnIds.Remove(id))
+        {
+            PlaySpawnAnimation(host);
+        }
+    }
+
+    private void StartIdleFloat(FrameworkElement host, Guid id)
+    {
+        if (!_floatingBubbleHosts.Add(host))
+        {
+            return;
+        }
+
+        if (host.RenderTransform is not TranslateTransform translate)
+        {
+            translate = new TranslateTransform();
+            host.RenderTransform = translate;
+        }
+
+        var seed = Math.Abs(id.GetHashCode());
+        var amplitudeY = 3.5 + seed % 35 / 10.0; // 3.5 - 6.9 px
+        var amplitudeX = 0.8 + seed % 16 / 10.0; // 0.8 - 2.3 px
+        var durationY = TimeSpan.FromSeconds(5.6 + seed % 30 / 10.0);
+        var durationX = TimeSpan.FromSeconds(6.8 + seed % 37 / 10.0);
+        var delay = TimeSpan.FromMilliseconds(seed % 900);
+
+        var yAnimation = new DoubleAnimation
+        {
+            From = amplitudeY * 0.35,
+            To = -amplitudeY,
+            Duration = durationY,
+            BeginTime = delay,
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+        };
+
+        var xAnimation = new DoubleAnimation
+        {
+            From = -amplitudeX,
+            To = amplitudeX,
+            Duration = durationX,
+            BeginTime = TimeSpan.FromMilliseconds(120 + seed % 1200),
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+        };
+
+        translate.BeginAnimation(TranslateTransform.YProperty, yAnimation);
+        translate.BeginAnimation(TranslateTransform.XProperty, xAnimation);
+    }
+
+    private void PlaySpawnAnimation(FrameworkElement host)
+    {
+        var visual = FindNamedDescendant<Border>(host, "BubbleVisual");
+        if (visual is null || !TryGetBubbleTransforms(visual, out var scale, out var translate))
+        {
+            return;
+        }
+
+        visual.Opacity = 0;
+        scale.ScaleX = 0.42;
+        scale.ScaleY = 0.42;
+        translate.Y = 68;
+        translate.X = _random.NextDouble() * 16 - 8;
+
+        var opacity = new DoubleAnimation
+        {
+            From = 0,
+            To = 1,
+            Duration = TimeSpan.FromMilliseconds(230),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+
+        var scaleFrames = new DoubleAnimationUsingKeyFrames();
+        scaleFrames.KeyFrames.Add(new EasingDoubleKeyFrame(0.42, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+        scaleFrames.KeyFrames.Add(new EasingDoubleKeyFrame(1.065, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(410)))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        });
+        scaleFrames.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(570)))
+        {
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut }
+        });
+
+        var rise = new DoubleAnimation
+        {
+            From = 68,
+            To = 0,
+            Duration = TimeSpan.FromMilliseconds(570),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+
+        var settleX = new DoubleAnimation
+        {
+            From = translate.X,
+            To = 0,
+            Duration = TimeSpan.FromMilliseconds(520),
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut }
+        };
+
+        visual.BeginAnimation(UIElement.OpacityProperty, opacity);
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleFrames);
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleFrames.Clone());
+        translate.BeginAnimation(TranslateTransform.YProperty, rise);
+        translate.BeginAnimation(TranslateTransform.XProperty, settleX);
+
+        SpawnBirthParticles(host);
+    }
+
+    private async Task PlayPopAnimationAsync(FrameworkElement host)
+    {
+        var visual = FindNamedDescendant<Border>(host, "BubbleVisual");
+        if (visual is null || !TryGetBubbleTransforms(visual, out var scale, out var translate))
+        {
+            return;
+        }
+
+        var center = host.TranslatePoint(
+            new Point(Math.Max(0, host.ActualWidth / 2), Math.Max(0, host.ActualHeight / 2)),
+            ParticleLayer);
+
+        var completion = new TaskCompletionSource<bool>();
+
+        var scaleFrames = new DoubleAnimationUsingKeyFrames
+        {
+            FillBehavior = FillBehavior.HoldEnd
+        };
+        scaleFrames.KeyFrames.Add(new LinearDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+        scaleFrames.KeyFrames.Add(new EasingDoubleKeyFrame(0.94, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(70)))
+        {
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseIn }
+        });
+        scaleFrames.KeyFrames.Add(new EasingDoubleKeyFrame(1.095, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(145)))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        });
+        scaleFrames.KeyFrames.Add(new EasingDoubleKeyFrame(1.16, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(225)))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        });
+
+        var fadeFrames = new DoubleAnimationUsingKeyFrames
+        {
+            FillBehavior = FillBehavior.HoldEnd
+        };
+        fadeFrames.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+        fadeFrames.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(85))));
+        fadeFrames.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(225)))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        });
+        fadeFrames.Completed += (_, _) => completion.TrySetResult(true);
+
+        var lift = new DoubleAnimation
+        {
+            From = translate.Y,
+            To = translate.Y - 4,
+            Duration = TimeSpan.FromMilliseconds(225),
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut },
+            FillBehavior = FillBehavior.HoldEnd
+        };
+
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleFrames);
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleFrames.Clone());
+        translate.BeginAnimation(TranslateTransform.YProperty, lift);
+        visual.BeginAnimation(UIElement.OpacityProperty, fadeFrames);
+
+        await Task.Delay(82);
+        SpawnPopParticles(center);
+        await completion.Task;
+    }
+
+    private void SpawnBirthParticles(FrameworkElement host)
+    {
+        if (!IsLoaded || host.ActualWidth <= 0 || host.ActualHeight <= 0)
+        {
+            return;
+        }
+
+        var origin = host.TranslatePoint(
+            new Point(host.ActualWidth * 0.5, host.ActualHeight * 0.9),
+            ParticleLayer);
+
+        for (var i = 0; i < 3; i++)
+        {
+            var size = 4.0 + _random.NextDouble() * 4.0;
+            var dx = (_random.NextDouble() - 0.5) * 24;
+            var dy = -(22 + _random.NextDouble() * 26);
+            CreateParticle(origin, size, dx, dy, 0.42 + _random.NextDouble() * 0.20, 420 + _random.Next(0, 180));
+        }
+    }
+
+    private void SpawnPopParticles(Point origin)
+    {
+        var count = _random.Next(5, 8);
+        for (var i = 0; i < count; i++)
+        {
+            var size = 4.0 + _random.NextDouble() * 7.0;
+            var angle = Math.PI * (0.08 + _random.NextDouble() * 0.84);
+            var distance = 14 + _random.NextDouble() * 24;
+            var dx = Math.Cos(angle) * distance * (_random.Next(0, 2) == 0 ? -1 : 1);
+            var dy = -Math.Abs(Math.Sin(angle) * distance) - _random.NextDouble() * 8;
+            CreateParticle(origin, size, dx, dy, 0.62 + _random.NextDouble() * 0.24, 190 + _random.Next(0, 100));
+        }
+    }
+
+    private void CreateParticle(Point origin, double size, double dx, double dy, double opacity, int durationMs)
+    {
+        var particle = new Ellipse
+        {
+            Width = size,
+            Height = size,
+            Opacity = opacity,
+            Fill = CreateParticleBrush(),
+            Stroke = new SolidColorBrush(Color.FromArgb(145, 116, 204, 235)),
+            StrokeThickness = Math.Max(0.5, size / 10),
+            IsHitTestVisible = false,
+            RenderTransformOrigin = new Point(0.5, 0.5)
+        };
+
+        var translate = new TranslateTransform();
+        var scale = new ScaleTransform(0.78, 0.78);
+        var transforms = new TransformGroup();
+        transforms.Children.Add(scale);
+        transforms.Children.Add(translate);
+        particle.RenderTransform = transforms;
+
+        Canvas.SetLeft(particle, origin.X - size / 2);
+        Canvas.SetTop(particle, origin.Y - size / 2);
+        ParticleLayer.Children.Add(particle);
+
+        var duration = TimeSpan.FromMilliseconds(durationMs);
+        var xAnimation = new DoubleAnimation(0, dx, duration)
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        var yAnimation = new DoubleAnimation(0, dy, duration)
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        var opacityAnimation = new DoubleAnimation(opacity, 0, duration)
+        {
+            BeginTime = TimeSpan.FromMilliseconds(durationMs * 0.30),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+        };
+        var scaleAnimation = new DoubleAnimation(0.78, 1.08, duration)
+        {
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut }
+        };
+
+        opacityAnimation.Completed += (_, _) => ParticleLayer.Children.Remove(particle);
+
+        translate.BeginAnimation(TranslateTransform.XProperty, xAnimation);
+        translate.BeginAnimation(TranslateTransform.YProperty, yAnimation);
+        particle.BeginAnimation(UIElement.OpacityProperty, opacityAnimation);
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnimation);
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnimation.Clone());
+    }
+
+    private static Brush CreateParticleBrush()
+    {
+        var brush = new RadialGradientBrush
+        {
+            Center = new Point(0.35, 0.30),
+            GradientOrigin = new Point(0.30, 0.25),
+            RadiusX = 0.72,
+            RadiusY = 0.72
+        };
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(245, 255, 255, 255), 0));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(220, 218, 247, 255), 0.52));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(90, 132, 214, 240), 1));
+        return brush;
+    }
+
+    private void StartAmbientBubbleAnimation()
+    {
+        if (_ambientAnimationStarted)
+        {
+            return;
+        }
+
+        _ambientAnimationStarted = true;
+
+        var bubbles = AmbientLayer.Children
+            .OfType<Ellipse>()
+            .Where(ellipse => ellipse.Width <= 30 && ellipse.Height <= 30)
+            .ToList();
+
+        foreach (var bubble in bubbles)
+        {
+            var translate = new TranslateTransform();
+            bubble.RenderTransform = translate;
+
+            var rise = 26 + _random.NextDouble() * 58;
+            var drift = (_random.NextDouble() - 0.5) * 16;
+            var duration = TimeSpan.FromSeconds(7.5 + _random.NextDouble() * 5.5);
+            var delay = TimeSpan.FromMilliseconds(_random.Next(0, 1600));
+
+            translate.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation
+            {
+                From = 8,
+                To = -rise,
+                Duration = duration,
+                BeginTime = delay,
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+            });
+
+            translate.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation
+            {
+                From = -drift * 0.35,
+                To = drift,
+                Duration = TimeSpan.FromSeconds(duration.TotalSeconds * 1.17),
+                BeginTime = delay,
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+            });
+
+            bubble.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation
+            {
+                From = Math.Max(0.12, bubble.Opacity * 0.72),
+                To = Math.Min(0.34, bubble.Opacity * 1.18),
+                Duration = TimeSpan.FromSeconds(duration.TotalSeconds * 0.68),
+                BeginTime = delay,
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+            });
+        }
+    }
+
+    private static bool TryGetBubbleTransforms(Border visual, out ScaleTransform scale, out TranslateTransform translate)
+    {
+        scale = null!;
+        translate = null!;
+
+        if (visual.RenderTransform is not TransformGroup group)
+        {
+            return false;
+        }
+
+        scale = group.Children.OfType<ScaleTransform>().FirstOrDefault()!;
+        translate = group.Children.OfType<TranslateTransform>().FirstOrDefault()!;
+        return scale is not null && translate is not null;
+    }
+
+    private FrameworkElement? FindBubbleHost(Guid id)
+    {
+        return FindDescendant<Grid>(this, grid => grid.Name == "BubbleHost" && grid.Tag is Guid gridId && gridId == id);
+    }
+
+    private static T? FindNamedDescendant<T>(DependencyObject root, string name) where T : FrameworkElement
+    {
+        return FindDescendant<T>(root, element => element.Name == name);
+    }
+
+    private static T? FindDescendant<T>(DependencyObject root, Func<T, bool> predicate) where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T typed && predicate(typed))
+            {
+                return typed;
+            }
+
+            var nested = FindDescendant(child, predicate);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
     }
 
     private void ShortcutSettings_Click(object sender, RoutedEventArgs e)
@@ -273,7 +714,7 @@ public partial class MainWindow : Window
 
     private void UpdateStatus()
     {
-        var normalStatus = $"{Memos.Count} / {MaxMemoCount} 件 · {_hotkeySettings.DisplayText} で表示/非表示 · ↓で選択 / Deleteで完了";
+        var normalStatus = $"{Memos.Count} / {MaxMemoCount} 件 · {_hotkeySettings.DisplayText} で表示/非表示 · ↓で泡を選択 / Deleteで弾く";
         StatusText.Text = _statusOverride ?? normalStatus;
     }
 
@@ -300,7 +741,7 @@ public partial class MainWindow : Window
         if (e.Key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None)
         {
             e.Handled = true;
-            CompleteMemoById(id, keepKeyboardNavigation: true);
+            _ = CompleteMemoWithAnimationAsync(id, keepKeyboardNavigation: true);
             return;
         }
 
@@ -347,23 +788,7 @@ public partial class MainWindow : Window
 
     private static WpfButton? FindCompletionButton(DependencyObject root, Guid id)
     {
-        var count = VisualTreeHelper.GetChildrenCount(root);
-        for (var i = 0; i < count; i++)
-        {
-            var child = VisualTreeHelper.GetChild(root, i);
-            if (child is WpfButton button && button.Tag is Guid buttonId && buttonId == id)
-            {
-                return button;
-            }
-
-            var nested = FindCompletionButton(child, id);
-            if (nested is not null)
-            {
-                return nested;
-            }
-        }
-
-        return null;
+        return FindDescendant<WpfButton>(root, button => button.Tag is Guid buttonId && buttonId == id);
     }
 
     private void Window_StateChanged(object? sender, EventArgs e)
