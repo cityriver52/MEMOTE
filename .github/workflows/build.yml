@@ -46,6 +46,30 @@ jobs:
           if (-not (Test-Path $exe)) { throw 'Portable memoNOW.exe was not created.' }
           Get-Item $exe | Select-Object Name, Length, LastWriteTime
 
+      - name: Smoke-test portable EXE startup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = (Resolve-Path '.\artifacts\memoNOW-win-x64\memoNOW.exe').Path
+          $log = Join-Path $env:LOCALAPPDATA 'memoNOW\logs\memoNOW.log'
+          if (Test-Path $log) { Remove-Item $log -Force }
+
+          $process = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 6
+          $process.Refresh()
+
+          if ($process.HasExited) {
+            if (Test-Path $log) {
+              Write-Host '--- memoNOW diagnostic log ---'
+              Get-Content $log
+              Write-Host '--- end diagnostic log ---'
+            }
+            throw "memoNOW exited during the startup smoke test with code $($process.ExitCode)."
+          }
+
+          Stop-Process -Id $process.Id -Force
+          Write-Host 'memoNOW remained alive for the startup smoke-test window.'
+
       - name: Upload portable EXE as Actions artifact
         uses: actions/upload-artifact@v4
         with:
