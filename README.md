@@ -1,14 +1,14 @@
-# memoNOW
+# MEMOTE
 
-**memoNOW** は、「今だけ頭に置いておきたいこと」を泡のように浮かべ、終わったら弾いて消す超短期メモです。
+**MEMOTE** は、**MEMO + MOTE**（漂う小さな粒）から名付けた、「今だけ頭に置いておきたいこと」を泡のように浮かべ、終わったら弾いて消す超短期メモです。
 
-> memoNOW is RAM, not storage.
+> MEMOTE is RAM, not storage.
 
-現在の memoNOW は **ローカルHTML版のみ**です。旧WPF / EXE版は廃止しました。
+MEMOTE は **ローカルHTML版のみ**です。ネイティブEXEやWebサーバーは使いません。
 
 ## 特徴
 
-- `memoNOW.html` 1ファイルだけで動作
+- `MEMOTE.html` 1ファイルだけで動作
 - Chromeでローカルファイルとして直接実行
 - Webサーバー不要
 - インストーラー不要
@@ -28,39 +28,39 @@
 
 ## 入手
 
-リポジトリ直下の `memoNOW.html` を保存してください。
+リポジトリ直下の `MEMOTE.html` を保存してください。
 
 直接保存用:
 
-`https://raw.githubusercontent.com/cityriver52/memoNOW/main/memoNOW.html`
+`https://raw.githubusercontent.com/cityriver52/MEMOTE/main/MEMOTE.html`
 
-GitHubへのアクセスが必要なのは **ファイルを取得するときだけ**です。保存後のmemoNOWはローカルファイルだけで完結し、GitHubへ通信しません。
+GitHubへのアクセスが必要なのは **ファイルを取得するときだけ**です。保存後のMEMOTEはローカルファイルだけで完結し、GitHubへ通信しません。
 
 ## 一番簡単な起動方法
 
-`memoNOW.html` をChromeへドラッグするか、右クリックしてChromeで開きます。
+`MEMOTE.html` をChromeへドラッグするか、右クリックしてChromeで開きます。
 
-ただし通常のブラウザタブではなくアプリ風の専用ウィンドウとして使う場合は、WindowsショートカットからChromeを `--app` モードで起動します。
+通常のブラウザタブではなくアプリ風の専用ウィンドウとして使う場合は、WindowsショートカットからChromeを `--app` モードで起動します。
 
 ## Chromeをアプリ風ウィンドウとして起動する
 
-まず `memoNOW.html` を削除・移動しない固定フォルダへ置きます。
+まず `MEMOTE.html` を削除・移動しない固定フォルダへ置きます。
 
 例:
 
 ```text
-C:\Users\<ユーザー名>\Documents\memoNOW\memoNOW.html
+C:\Users\<ユーザー名>\Documents\MEMOTE\MEMOTE.html
 ```
 
 Windowsで新しいショートカットを作り、リンク先を次の形式にします。
 
 ```text
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --app="file:///C:/Users/<ユーザー名>/Documents/memoNOW/memoNOW.html"
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --app="file:///C:/Users/<ユーザー名>/Documents/MEMOTE/MEMOTE.html"
 ```
 
 Chromeが別の場所にインストールされている場合は、`chrome.exe` の部分だけ実際のパスへ変更してください。
 
-これで、アドレスバーやタブのないmemoNOW専用ウィンドウとして起動します。
+これで、アドレスバーやタブのないMEMOTE専用ウィンドウとして起動します。
 
 ## キーボードショートカットで起動する
 
@@ -72,13 +72,15 @@ Chromeが別の場所にインストールされている場合は、`chrome.exe
 Ctrl + Alt + M
 ```
 
-この方式ではmemoNOW自身がグローバルキーを監視しません。Windowsが普通のショートカットを起動し、そのショートカットがChromeを開きます。
+この方式ではMEMOTE自身がグローバルキーを監視しません。Windowsが普通のショートカットを起動し、そのショートカットがChromeを開きます。
 
-会社PCで使う場合も、ネイティブ常駐アプリ、キーボードフック、RegisterHotKey、タスクスケジューラなどは使用しません。
+会社PCで使う場合も、ネイティブ常駐アプリ、キーボードフック、`RegisterHotKey`、タスクスケジューラなどは使用しません。
 
 ## データ保存
 
-メモはJavaScriptの `localStorage` に保存します。
+メモはJavaScriptの `localStorage` に保存します。現在の保存キーは `MEMOTE.local.v1` です。
+
+旧memoNOW版を同じブラウザ保存領域で開いた場合は、旧キー `memoNOW.local.v1` も読み取り、MEMOTEの保存キーへ自動移行します。
 
 サーバー、GitHub、Google Driveなどには保存しません。
 
@@ -88,12 +90,13 @@ Ctrl + Alt + M
 - 組織ポリシー等でブラウザデータが消去された場合
 - 別ブラウザで開いた場合
 - 環境によってローカルファイルの保存領域の扱いが変わった場合
+- HTMLファイルの保存場所やファイル名を変更した場合
 
-memoNOWは短期記憶用なので、重要な長期情報は別の保存先へ移してください。
+MEMOTEは短期記憶用なので、重要な長期情報は別の保存先へ移してください。
 
 ## ネットワークについて
 
-`memoNOW.html` には外部リソースへのURL参照や通信コードを含めていません。
+`MEMOTE.html` には外部リソースへのURL参照や通信コードを含めていません。
 
 さらにHTML内のContent Security Policyで次を指定しています。
 
@@ -103,13 +106,13 @@ connect-src 'none'
 
 そのためアプリ動作中に `fetch`、WebSocket等を使って外部へ接続する設計にはなっていません。
 
-CSSとJavaScriptもすべて `memoNOW.html` 内に埋め込んでいます。
+CSSとJavaScriptもすべて `MEMOTE.html` 内に埋め込んでいます。
 
 ## ファイル構成
 
 ```text
-memoNOW.html   # アプリ本体。これだけで動く
-README.md      # 説明
+MEMOTE.html   # アプリ本体。これだけで動く
+README.md     # 説明
 ```
 
 ビルド工程はありません。
