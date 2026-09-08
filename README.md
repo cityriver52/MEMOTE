@@ -10,6 +10,7 @@ The first prototype deliberately stays small:
 
 - Quick one-line memo input
 - User-configurable global hotkey (default: `Win + Shift + Space`)
+- Global hotkey toggles the window: hidden → show/focus, visible → hide
 - Up to 10 active memos
 - One-click completion (completed memos are deleted immediately)
 - Tray-resident operation
@@ -23,6 +24,11 @@ The first prototype deliberately stays small:
 The default shortcut is `Win + Shift + Space`. If Windows or another application already uses it, click **ショートカット設定** at the bottom of memoNOW, then click the capture field and press the new key combination you want to use.
 
 The shortcut can also be changed from the tray menu via **Shortcut settings...**.
+
+The shortcut works as a toggle:
+
+- When memoNOW is hidden, press it to show memoNOW and focus the memo input.
+- When memoNOW is visible, press it again to hide memoNOW.
 
 memoNOW tests the new shortcut before accepting it. If Windows reports that the combination is already in use, memoNOW keeps the previous shortcut instead. The chosen shortcut is saved locally and restored on the next launch.
 
@@ -106,11 +112,11 @@ There is intentionally no completed-item history. If a memo matters long-term, i
 
 | Action | Control |
 | --- | --- |
-| Open/focus memoNOW | Configurable global shortcut (default `Win + Shift + Space`) |
+| Show/hide memoNOW | Configurable global shortcut (default `Win + Shift + Space`) |
 | Change global shortcut | Bottom **ショートカット設定** button / tray menu |
 | Add memo | Type and press `Enter` |
 | Complete memo | Click `Done` |
-| Hide window | `Esc`, minimize, or close |
+| Hide window | Global shortcut while visible, `Esc`, minimize, or close |
 | Re-open from tray | Double-click tray icon / tray menu |
 | Quit completely | Tray icon → `Exit` |
 
